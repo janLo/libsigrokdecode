@@ -44,6 +44,10 @@ class Decoder(srd.Decoder):
         ('bit', 'Bits', (0, 1)),
         ('rgb', 'RGB', (2,)),
     )
+    options = (
+        {'id': 'device', 'desc': 'LED Chip used',
+         'default': 'generic', 'values': ('generic', 'WS2812B')},
+    )
 
     def __init__(self):
         self.samplerate = None
@@ -103,10 +107,16 @@ class Decoder(srd.Decoder):
             if not self.oldpin and pin:
                 # Rising edge.
                 if self.ss and self.es:
-                    period = self.samplenum - self.ss
                     duty = self.es - self.ss
-                    # Ideal duty for T0H: 33%, T1H: 66%.
-                    bit_ = (duty / period) > 0.5
+
+                    if self.options['device'] == "WS2812B":
+                        # according to spec 0.8us +- 150ns
+                        # reality says 600ns works reliable
+                        bit_ = float(duty) / self.samplerate > 0.6e-6
+                    else:
+                        period = self.samplenum - self.ss
+                        # Ideal duty for T0H: 33%, T1H: 66%.
+                        bit_ = (duty / period) > 0.5
 
                     self.put(self.ss, self.samplenum, self.out_ann,
                              [0, ['%d' % bit_]])
